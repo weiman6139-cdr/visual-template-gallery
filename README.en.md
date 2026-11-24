@@ -72,13 +72,16 @@ For hosts **without** an MCP Apps panel. When the model calls `open_template_gal
 
 Installation (from source):
 
+> **⚠️ You must run `npm run build` first, otherwise it will not start.**
+> `web-compatible/plugins/visual-template-gallery/server.mjs` (a ~1.4 MB esbuild bundle) is **not tracked** per that project's `.gitignore`. After `git clone`, `plugins/visual-template-gallery/` contains only `mcp.json`, `SKILL.md` and `README.md` — `server.mjs` is missing, and the `__INSTALL_DIR__/server.mjs` placeholder in `mcp.json` is never substituted. Installing as-is fails because the entry file does not exist.
+
 ```bash
 cd web-compatible
 npm install
-npm run build
+npm run build      # required: generates plugins/.../server.mjs from src/mcp/server.ts
 ```
 
-For WorkBuddy, use the prebuilt connector: `web-compatible/connector-package/visual-template-gallery-connector-v0.3.0.zip` (includes `connector-meta.json`, `token-schema.json`, `icon.svg`, and a prebuilt `server.mjs`).
+Prefer not to build? WorkBuddy users can use the prebuilt connector directly — it already contains a built `server.mjs`: `web-compatible/connector-package/visual-template-gallery-connector-v0.3.0.zip` (includes `connector-meta.json`, `token-schema.json`, `icon.svg`, and `server.mjs`).
 
 See [`web-compatible/README.md`](web-compatible/README.md).
 
@@ -93,8 +96,13 @@ visual-template-gallery/
 │   ├── codex-native-panel.jpg    # native panel edition (Codex)
 │   └── workbuddy-web.jpg         # web compatible edition (WorkBuddy)
 ├── native-panel/                 # MCP service 1: native panel (Codex / Claude Code)
+│   └── plugins/.../server.mjs    # ✅ committed (carries a manual "no thread binding" patch)
 └── web-compatible/               # MCP service 2: web compatible (WorkBuddy / Trae)
+    ├── plugins/.../server.mjs    # ❌ not committed — run npm run build to generate
+    └── connector-package/        # ✅ prebuilt connector with a runnable server.mjs
 ```
+
+The two sub-projects handle `server.mjs` differently: `native-panel/` tracks it (it carries a manual patch that a rebuild would overwrite, losing functionality); `web-compatible/` treats it as a pure build artifact and excludes it, shipping a ready-to-run copy under `connector-package/` instead.
 
 ---
 
@@ -121,7 +129,7 @@ npm run typecheck  # type check
 ```
 
 - `native-panel/` additionally provides `npm run test:app-host` (port-4180 protocol test host), `npm run doctor` (client-consistency self-check) and `npm run prune` (keep only the latest version).
-- `web-compatible/`'s release bundle `plugins/visual-template-gallery/server.mjs` is a build artifact (excluded in `.gitignore`); run `npm run build` before installing. The prebuilt connector lives under `connector-package/`.
+- `web-compatible/`'s release bundle `plugins/visual-template-gallery/server.mjs` is a build artifact (excluded in `.gitignore`, so it is absent from the repo); you **must** run `npm run build` before installing. If you would rather not build, use the prebuilt connector under `connector-package/`.
 
 ---
 
@@ -132,6 +140,8 @@ npm run typecheck  # type check
 **Does the gallery upload anything?** No. It only reads local directories and official GitHub example images; path configuration is stored locally.
 
 **Why doesn't the web edition inject the selection automatically?** Hosts without a panel have no host-sync channel, so the web edition only provides a read-only page and the user copies the template name back into the chat.
+
+**The plugin won't start after cloning / it says `server.mjs` is missing?** That is expected. `web-compatible/plugins/` does not contain build artifacts — run `cd web-compatible && npm install && npm run build` to generate it, or use the prebuilt connector under `connector-package/`. See [Service 2 installation](#service-2-web-compatible-web-compatible--workbuddy--trae) above.
 
 ---
 

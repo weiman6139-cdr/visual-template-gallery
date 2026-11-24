@@ -72,13 +72,16 @@ codex plugin add visual-template-gallery@visual-template-local
 
 安装（源码构建）：
 
+> **⚠️ 必须先执行 `npm run build`，否则装不起来。**
+> `web-compatible/plugins/visual-template-gallery/server.mjs`（约 1.4 MB 的 esbuild 打包产物）按该项目 `.gitignore` **不纳入版本管理**。`git clone` 后 `plugins/visual-template-gallery/` 下只有 `mcp.json`、`SKILL.md`、`README.md` 三个文件，`server.mjs` 缺失，且 `mcp.json` 里的 `__INSTALL_DIR__/server.mjs` 仍是占位符——直接安装会因找不到入口文件而失败。
+
 ```bash
 cd web-compatible
 npm install
-npm run build
+npm run build      # 必需：由 src/mcp/server.ts 生成 plugins/.../server.mjs
 ```
 
-WorkBuddy 可直接使用预打包连接器：`web-compatible/connector-package/visual-template-gallery-connector-v0.3.0.zip`（含 `connector-meta.json`、`token-schema.json`、`icon.svg` 与已构建的 `server.mjs`）。
+不想构建也可以——WorkBuddy 用户直接用预打包连接器，其中已含构建好的 `server.mjs`：`web-compatible/connector-package/visual-template-gallery-connector-v0.3.0.zip`（含 `connector-meta.json`、`token-schema.json`、`icon.svg` 与 `server.mjs`）。
 
 详见 [`web-compatible/README.md`](web-compatible/README.md)。
 
@@ -93,8 +96,13 @@ visual-template-gallery/
 │   ├── codex-native-panel.jpg    # 原生面板版（Codex）
 │   └── workbuddy-web.jpg         # 网页兼容版（WorkBuddy）
 ├── native-panel/                 # MCP 服务 1：原生面板版（Codex / Claude Code）
+│   └── plugins/.../server.mjs    # ✅ 已提交（含手工「无 thread 绑定」补丁）
 └── web-compatible/               # MCP 服务 2：网页兼容版（WorkBuddy / Trae）
+    ├── plugins/.../server.mjs    # ❌ 未提交，需 npm run build 生成
+    └── connector-package/        # ✅ 预构建连接器，含可直接运行的 server.mjs
 ```
+
+两个子项目对 `server.mjs` 的处理不同：`native-panel/` 把它纳入版本管理（内含会被构建覆盖的手工补丁，丢失会丢功能）；`web-compatible/` 视其为纯构建产物而排除，改用 `connector-package/` 提供即用副本。
 
 ---
 
@@ -121,7 +129,7 @@ npm run typecheck  # 类型检查
 ```
 
 - `native-panel/` 额外提供 `npm run test:app-host`（4180 协议测试宿主）、`npm run doctor`（客户端一致性自检）、`npm run prune`（只保留最新版本）。
-- `web-compatible/` 的发行包 `plugins/visual-template-gallery/server.mjs` 为构建产物（已在 `.gitignore` 中排除），安装前需先 `npm run build`；预构建的连接器见 `connector-package/`。
+- `web-compatible/` 的发行包 `plugins/visual-template-gallery/server.mjs` 为构建产物（已在 `.gitignore` 中排除，仓库里不存在），**安装前必须** `npm run build`；无需构建的场景请改用 `connector-package/` 里的预构建连接器。
 
 ---
 
@@ -132,6 +140,8 @@ npm run typecheck  # 类型检查
 **图库会不会上传内容？** 不会。图库只读取本机目录与官方 GitHub 示例图，路径配置仅保存在本机。
 
 **为什么不自动把选择注入对话（兼容版）？** 无面板宿主没有宿主同步通道，兼容版只提供只读网页，由用户复制模板名称带回对话。
+
+**clone 后插件起不来 / 提示找不到 `server.mjs`？** 正常现象。`web-compatible/plugins/` 下不含构建产物，先 `cd web-compatible && npm install && npm run build` 生成；或直接改用 `connector-package/` 里的预构建连接器。详见上文[服务 2 安装说明](#服务-2网页兼容版web-compatible--workbuddy--trae)。
 
 ---
 
