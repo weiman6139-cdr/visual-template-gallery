@@ -1,0 +1,26 @@
+{
+  "name": "visual-template-gallery",
+  "version": "0.2.14",
+  "description": "Browse every template in a Skill using a Codex MCP App and synchronize selected visual references to model context when supported by the host.",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "可视化模板图库",
+    "shortDescription": "Browse and select visual templates.",
+    "longDescription": "A Codex MCP App plugin for viewing all official GitHub examples from a template Skill, selecting one or more templates and updating model reference context through the host's MCP Apps bridge. It does not generate previews, send messages, modify the composer, or listen to arbitrary Skill invocation events. Requires a host supporting MCP Apps and updateModelContext.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read"
+    ],
+    "defaultPrompt": [
+      "浏览当前 Skill 的全部模板示例",
+      "选择模板并保存视觉参考上下文",
+      "打开模板图库"
+    ]
+  }
+}

@@ -1,0 +1,457 @@
+{
+  "schemaVersion": 6,
+  "title": "可视化插件（兼容版）纯网页端方案（简化版）",
+  "generatedAt": "2026-10-29",
+  "status": "phase-1-3-done / phase-4-pending",
+  "supersedes": {
+    "file": "docs/plans/2026-10-29-web-only-plan.json",
+    "schemaVersion": 5,
+    "reason": "第三轮审查以『去过度设计』为准绳精简：删除并发上限与 429、进度协议改为 503 重试、删除缓存 LRU 与总量上限、删除分页/虚拟滚动与关键词搜索、多 token 会话降为单活跃会话、界面状态收敛为 2 种、删除开发期调试入口；修正 VTG_SKILL_ROOTS 由必填改为可选并保留默认根目录；补充图片响应头要求。"
+  },
+  "source": {
+    "parentProject": "/Users/wxd/视频动画/可视化插件",
+    "parentPluginVersion": "0.2.7",
+    "compatibleBaselinePath": "/Users/wxd/pi-cwd-20260723/可视化插件（兼容版）",
+    "compatibleBaselineCommit": "51f194d",
+    "baselineVerification": {
+      "commands": [
+        "npm ci",
+        "npm run build",
+        "npm run typecheck",
+        "npx vitest run"
+      ],
+      "result": "typecheck 通过，47/47 测试通过"
+    }
+  },
+  "context": {
+    "goal": "让本插件能在 Trae、WorkBuddy 等无 MCP Apps UI 能力的宿主中，用本地网页浏览目标 Skill 的全部模板、挑选后把选择带回对话。",
+    "hosts": {
+      "trae": {
+        "mcp": "支持，配置位于 ~/Library/Application Support/Trae CN/User/mcp.json（mcpServers 格式）",
+        "mcpApps": "不支持，无法渲染 ui:// 界面",
+        "invoke": "技能可用 @ 或 / 调出，具体形态由客户端决定"
+      },
+      "workbuddy": {
+        "mcp": "支持，按其 MCP 配置方式添加",
+        "mcpApps": "不支持，无法渲染 ui:// 界面",
+        "invoke": "同上"
+      }
+    },
+    "coreConstraint": "无 UI 宿主上不存在 ui/update-model-context 等价桥接，选择无法自动注入上下文，只能由用户显式带出（复制模板名称）后交回对话。",
+    "scaleNote": "模板数量以目标 Skill 实际解析结果为准。页面一次性渲染全部条目 + 图片懒加载；只有实测卡顿时才评估增量渲染。"
+  },
+  "scope": {
+    "inScope": [
+      "本地只读 HTTP 服务：模板浏览页、模板数据 API、图片流接口与本地缓存",
+      "唤起要求：用户必须先显式调出插件（@ 或 /，形态由宿主决定）才启动；插件自身不自动触发",
+      "网页浏览：缩略图网格、分类筛选、详情、单选/多选、复制模板名称",
+      "Codex 面板相关代码、样式、测试夹具、构建产物、孤儿依赖、插件元数据与插件 SKILL.md 一并改造或删除",
+      "文档索引口径改写：旧面板文档标注为被 ADR-0005 取代，保留历史不删除",
+      "宿主安装路径文档：Trae / WorkBuddy 的 MCP 配置片段与操作步骤"
+    ],
+    "outOfScope": [
+      "MCP App / ui:// 界面、displayMode 协商、app 挂载诊断",
+      "ui/update-model-context 被动注入",
+      "模板编号体系与按编号回读工具",
+      "服务端保存选择状态、选择回读工具",
+      "MCP Prompt / MCP Resource 附着形态",
+      "对话内图片网格",
+      "跨设备访问、团队共享、公网部署、域名与证书",
+      "并发配额、进度协议、缓存淘汰策略、虚拟滚动、关键词搜索（均为当前规模下的过度设计）"
+    ]
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "topic": "本目录定位",
+      "choice": "B",
+      "value": "本目录只保留网页链路；Codex 面板代码物理删除，面板能力留在上游项目",
+      "status": "confirmed"
+    },
+    {
+      "id": "D2",
+      "topic": "唤起方式",
+      "choice": "已确认",
+      "value": "用户必须先在对话中显式调出技能与插件（@ 或 /，形态由宿主决定，方案不绑定具体符号）。插件纯被动：技能被加载不等于打开图库",
+      "status": "confirmed"
+    },
+    {
+      "id": "D3",
+      "topic": "删除范围",
+      "choice": "A",
+      "value": "物理删除面板相关源码、样式、构建产物、测试与测试夹具，不做保留禁用",
+      "status": "confirmed"
+    },
+    {
+      "id": "D4",
+      "topic": "带入方式",
+      "choice": "已确认",
+      "value": "网页提供『复制模板名称』，用户粘贴回对话；模型依据已加载的 Skill 参考自行匹配。不提供回读工具，不做自动注入",
+      "status": "confirmed"
+    },
+    {
+      "id": "F1",
+      "topic": "目标 Skill 路径来源",
+      "choice": "A（v6 修订）",
+      "value": "VTG_SKILL_ROOTS 可选：配置则作为唯一允许根目录并充当白名单；未配置时回退默认根目录 [~/.codex/skills, ~/.agents/skills]，白名单即这些默认值。零配置可用",
+      "status": "confirmed"
+    },
+    {
+      "id": "F2",
+      "topic": "交付形态",
+      "choice": "α",
+      "value": "本地只读服务（随机端口 + 会话期 token + 仅绑 127.0.0.1 + Host/Origin 校验 + 空闲自关）；不做 file:// 静态导出，因为需要服务端做图片代理与缓存",
+      "status": "confirmed"
+    },
+    {
+      "id": "Q3",
+      "topic": "模板标识",
+      "choice": "已确认",
+      "value": "取消编号与附加 ID，复制内容就是模板名称原文（与 GitHub 源仓库名称一致，双语标题如『UI Screenshot System / UI 截图系统』）",
+      "status": "confirmed"
+    },
+    {
+      "id": "LIFE",
+      "topic": "服务生命周期",
+      "choice": "已确认",
+      "value": "页面有动作即续期；无动作满 5 分钟回收会话。已复制的文本不受影响",
+      "status": "confirmed"
+    },
+    {
+      "id": "AUTH",
+      "topic": "鉴权载体",
+      "choice": "v4 修订",
+      "value": "不使用 cookie（按 host 存储、不区分端口）。页面从 URL 读 token 存内存，API 带 X-VTG-Token 头",
+      "status": "confirmed"
+    },
+    {
+      "id": "AUTH2",
+      "topic": "图片接口鉴权",
+      "choice": "v5 修订",
+      "value": "图片接口用查询参数 /api/image/<templateId>?t=<token>（<img> 无法携带自定义头）。仅 GET、只读、校验会话归属",
+      "status": "confirmed"
+    },
+    {
+      "id": "SESSION",
+      "topic": "会话数量模型",
+      "choice": "v6 修订",
+      "value": "单活跃会话：再次唤起即替换旧会话，旧链接返回失效文案。服务端只需一个会话变量，不做多 token 并发登记",
+      "status": "confirmed"
+    },
+    {
+      "id": "TRIGGER",
+      "topic": "触发主路径",
+      "choice": "v4 修订",
+      "value": "工具 description 是唯一机械可靠的触发点，为主路径：必须写明使用场景、中文触发语与反例",
+      "status": "confirmed"
+    },
+    {
+      "id": "DEVCLEAN",
+      "topic": "Codex 专属开发工具去留",
+      "choice": "v5 新增",
+      "value": "删除 scripts/reload-mcp.mjs、tests/reload-mcp.test.ts 与 package.json 的 reload:mcp 脚本，README 对应章节移除",
+      "status": "confirmed"
+    },
+    {
+      "id": "PACKAGING",
+      "topic": "发行包形态",
+      "choice": "v5 新增",
+      "value": "保留 plugins/visual-template-gallery 与 .codex-plugin/plugin.json 作为统一清单，描述改为网页版能力；各宿主按自身 MCP 配置引用同一个 server.mjs",
+      "status": "confirmed"
+    },
+    {
+      "id": "TRIM",
+      "topic": "v6 精简项",
+      "choice": "v6 修订",
+      "value": "不做：并发上限与 429、进度百分比协议（改 503 + 前端重试）、缓存 LRU 与总量上限、分页与虚拟滚动、关键词搜索（先用分类+浏览器查找）、多 token 并发会话、开发期调试入口。界面状态收敛为 2 种（加载中 / 会话失效）",
+      "status": "confirmed"
+    }
+  ],
+  "openItems": [
+    {
+      "id": "G1",
+      "topic": "触发可靠性",
+      "resolution": "已升级为主路径：以工具 description 承载触发语与反例",
+      "status": "closed"
+    },
+    {
+      "id": "G2",
+      "topic": "编号漂移",
+      "resolution": "已消解：编号取消，改为复制名称",
+      "status": "closed"
+    },
+    {
+      "id": "G3",
+      "topic": "模板名称歧义",
+      "detail": "若两个模板名称高度相似，模型可能匹配错误",
+      "mitigation": "复制内容严格等于模板名称；详情面板保留展示 ID 供人工核对；实测若出错再评估补充手段",
+      "status": "monitor"
+    },
+    {
+      "id": "G4",
+      "topic": "模板数增长后的渲染表现",
+      "detail": "一次性渲染在条目上百时可能卡顿",
+      "mitigation": "当前规模无需处理；实测卡顿再加『加载更多』，不做虚拟滚动",
+      "status": "monitor"
+    }
+  ],
+  "architecture": {
+    "flow": [
+      "1. 用户显式调出技能与插件（@ 或 /，形态由宿主决定）",
+      "2. 模型调用 open_template_gallery；插件解析目标 Skill，启动/复用只读服务，返回带 token 的链接",
+      "2a. 根目录下发现多个含模板的 Skill 时，工具返回候选名，用户说出名称后再调一次",
+      "3. 用户在浏览器浏览模板：网格、分类筛选、详情大图、单选/多选（首屏注入后用 history.replaceState 清掉地址栏 token）",
+      "4. 用户点『复制模板名称』，得到类似『UI Screenshot System / UI 截图系统、Infographic Engine / 信息图引擎』的文本",
+      "5. 用户回到对话粘贴该文本并说明任务；模型依据已加载的 Skill 参考按名称匹配模板并执行"
+    ],
+    "serverModel": {
+      "instance": "每个 MCP 进程内单例 HTTP 服务，随机端口，仅绑 127.0.0.1",
+      "session": "单活跃会话：一个 token → (skillPath, templates, createdAt, lastActivityAt)。templates 是本次解析结果的缓存（不是选择状态），避免 /api/gallery 与 /api/image 每次请求重复解析；再次唤起替换旧会话，旧链接失效",
+      "lifetime": "空闲 5 分钟回收会话并关闭监听；MCP 进程退出即全部失效",
+      "notPersisted": "会话与 token 不落盘，重启后需重新唤起",
+      "hostDependency": "网页依赖 MCP 子进程存活：宿主退出或回收进程时页面立即失效"
+    },
+    "binding": "URL 只绑 127.0.0.1，不使用 localhost（避免解析到 ::1 而服务只绑 IPv4 导致空白页）",
+    "httpApi": [
+      {
+        "route": "GET /?token=...",
+        "auth": "查询参数（仅首屏）",
+        "note": "返回页面；前端注入 token 后用 history.replaceState 清除地址栏 token"
+      },
+      {
+        "route": "GET /api/gallery",
+        "auth": "X-VTG-Token 请求头",
+        "note": "模板数据。解析未就绪返回 503，前端每 1 秒重试（无进度协议）；会话失效返回 410"
+      },
+      {
+        "route": "GET /api/image/<templateId>?t=<token>",
+        "auth": "查询参数",
+        "note": "图片字节流。按缓存元数据返回 Content-Type，并带 Cache-Control: private, max-age=86400；命中本地缓存直接返回"
+      },
+      {
+        "route": "写接口",
+        "auth": "-",
+        "note": "不存在。全部接口只读"
+      }
+    ],
+    "errorCodes": {
+      "401": "token 缺失或无效（提示重新唤起）",
+      "404": "templateId 不存在",
+      "410": "会话已失效（空闲超时或宿主进程结束）",
+      "503": "模板解析中，前端自动重试"
+    },
+    "pageCapabilities": [
+      "缩略图网格（<img loading=\"lazy\">，一次性渲染全部条目）",
+      "分类筛选",
+      "详情面板（大图 + 提示词指导 + 来源 + example case + ID 供人工核对）",
+      "单选/多选",
+      "复制模板名称（原文，不加前缀或 ID）",
+      "两种界面状态：加载中 / 会话失效（附重新唤起引导）",
+      "界面文案使用中文"
+    ]
+  },
+  "toolContracts": [
+    {
+      "name": "open_template_gallery",
+      "change": "改造",
+      "input": {
+        "skillName": "string?（多 Skill 时用于消歧；省略时按允许根目录自动发现）"
+      },
+      "output": {
+        "url": "带 token 的本地链接（会话期有效）",
+        "skillName": "解析出的 Skill 名",
+        "templateCount": "number",
+        "idleTimeoutMinutes": 5
+      },
+      "descriptionRequirement": "必须包含：使用场景、中文触发语（如『用户说打开/查看模板图库时调用』）、反例（如『用户仅提到某个模板名称、或要直接生成图片时不要调用』）。这是触发的主路径",
+      "note": "工具调用内完成解析（多数情况为毫秒级）；只登记一个会话，不创建选择状态"
+    },
+    {
+      "name": "removed",
+      "change": "删除",
+      "items": [
+        "report_app_state",
+        "get_template_gallery",
+        "get_selected_templates",
+        "select_templates",
+        "clear_template_context",
+        "get_template_preview（改为 HTTP /api/image 流接口）"
+      ],
+      "reconsider": "不新增回读工具"
+    },
+    {
+      "name": "featureFlag",
+      "change": "新增",
+      "item": "VTG_DISABLE=1",
+      "semantics": "禁用后不注册 open_template_gallery（工具消失），不启动监听",
+      "scope": "phase 2"
+    }
+  ],
+  "failureCopy": {
+    "principle": "文案面向用户可读，不含绝对路径、不含堆栈、不暗示已同步",
+    "serverStartFailed": "本地图库服务启动失败（端口尝试 3 次后仍不可用），请稍后重试；本次未生成任何链接",
+    "skillNotFound": "未在允许的 Skill 目录中找到可用的模板 Skill，请确认 VTG_SKILL_ROOTS 配置或指定 Skill 名称",
+    "skillAmbiguous": "发现多个含模板的 Skill：<候选名列表>。请说出要用哪一个",
+    "noTemplates": "该 Skill 未解析到任何模板，图库不会打开；请确认该 Skill 是否包含模板索引",
+    "pathRejected": "该路径不在允许的 Skill 目录内，已拒绝访问",
+    "imageUnavailable": "官方示例图暂时无法获取，可查看来源链接或稍后重试",
+    "sessionInvalid": "图库会话已失效（空闲超时或宿主进程已结束），请重新唤起插件"
+  },
+  "security": {
+    "binding": "仅 127.0.0.1，随机端口；端口占用时换端口重试，最多 3 次，仍失败返回可读错误且不终止 MCP 进程",
+    "auth": "API 使用会话期 token（请求头 X-VTG-Token）；图片接口因 <img> 限制改用查询参数 t；不使用 cookie",
+    "customHeaderBenefit": "自定义请求头会触发跨源预检，浏览器会阻止非授权来源读取 API 响应",
+    "hostCheck": "校验 Host 必须为 127.0.0.1:<port>，防 DNS rebinding",
+    "originPolicy": "若请求携带 Origin，必须与 127.0.0.1:<port> 匹配；同源 GET 不发送 Origin，此时依赖 token 与 Host 校验（不得因缺少 Origin 而拒绝）",
+    "sameOriginPage": "页面由同一服务提供，不采用『远端静态页 + 本地 API』组合",
+    "pathWhitelist": "Skill 路径 realpath 后必须位于允许根目录内（配置值或默认值）；拒绝时错误信息不含绝对路径",
+    "imageProxy": "仅允许 raw.githubusercontent.com 与 cdn.jsdelivr.net，禁止任意 URL 转发；限制单图大小与超时",
+    "imageIdScope": "templateId 必须属于当前会话解析结果，会话内不存在的 id 直接 404，不得跨会话或按任意 id 探测",
+    "cache": "沿用单文件 12MB 上限，不设总量上限、不做 LRU；缓存目录位置写进文档，用户可手动清理",
+    "requestLimits": "请求头长度上限、URL 长度上限",
+    "readOnly": "所有接口只读，无写接口，因此无 CSRF 状态改写风险",
+    "lifecycle": "宿主重启或会话回收后关闭监听，不常驻；无僵尸端口"
+  },
+  "distribution": {
+    "artifact": "npm run build 生成 plugins/visual-template-gallery/{server.mjs, .mcp.json, .codex-plugin/plugin.json, skills/}，已打包依赖，安装目录无需 npm install",
+    "trae": "在 ~/Library/Application Support/Trae CN/User/mcp.json 的 mcpServers 下新增条目：command 为 node，args 为 server.mjs 的绝对路径，并显式给出绝对 cwd",
+    "workbuddy": "按其 MCP 配置方式注册同一 server.mjs 绝对路径，README 分步说明",
+    "env": "VTG_SKILL_ROOTS 可选（绝对路径，多个用系统分隔符）；VTG_DISABLE=1 可选",
+    "codex": "本目录版本在 Codex 中也只走网页链路；面板能力保留在上游项目"
+  },
+  "phases": [
+    {
+      "phase": 1,
+      "name": "删除 Codex 面板链路（含元数据、说明书与文档索引）",
+      "work": [
+        "删除 src/ui/mcp-app.{ts,css,html}、context-sync.ts、context-update.ts、gallery-state.ts",
+        "server.ts：移除 ui:// 资源注册、appPath 解析、APP_URI/APP_MIME/openMeta、appMeta 工具、threadId 解析、report_app_state 与诊断常量",
+        "gallery-service.ts：移除 threadId 门禁与 selectedIds、referenceContext 等整套选择模型；preview 改为可被 HTTP 层复用的取图方法",
+        "discoverSkills 根目录改为：VTG_SKILL_ROOTS 优先，未配置时用默认根目录",
+        "重写插件 SKILL.md：删除 update-model-context、clear_template_context、面板选择等已不存在的能力，改为『打开图库 → 浏览器浏览 → 复制模板名称 → 回对话粘贴』",
+        "更新 plugin.json：description 与 capabilities 不再声称 MCP App / Interactive",
+        "build-plugin.mjs：移除 app.html 内联与 src/ui 入口构建，核对 public/scripts 清理逻辑；删除 plugins/.../assets/app.html",
+        "删除 tests/ui/*、tests/fixtures/mcp-app-host.mjs、scripts/test-mcp-host.mjs 与 test:app-host 脚本",
+        "删除 scripts/reload-mcp.mjs、tests/reload-mcp.test.ts 与 reload:mcp 脚本",
+        "移除依赖 @modelcontextprotocol/ext-apps 并同步 lockfile",
+        "调整 tests/mcp/gallery.test.ts 中 24 处 threadId 依赖与选择断言；清理空测试目录",
+        "改写 docs/README.md 索引口径；给 docs/2026-10-09-*.md 与 docs/adr/0004-*.md 增加『已被 ADR-0005 取代』标记，保留历史正文"
+      ],
+      "cost": "1 - 1.5 人日",
+      "exitCriteria": "npm run build / typecheck / test 全绿；插件仅剩纯工具形态；无任何指导模型调用已删工具的文案；docs 索引不再声称面板为唯一运行目标"
+    },
+    {
+      "phase": 2,
+      "name": "只读服务 + 工具",
+      "work": [
+        "单例 HTTP 服务：随机端口（占用重试 3 次）、X-VTG-Token 校验、Host 校验、Origin 带则匹配、单会话空闲 5 分钟续期回收",
+        "GET /api/gallery（未就绪 503，会话失效 410）与 GET /api/image/<templateId>?t= 字节流（含 Content-Type 与 Cache-Control），替代 base64 dataUrl 内联",
+        "图片代理与缓存复用 AssetCache（不新增淘汰逻辑）",
+        "单活跃会话登记；多 Skill 消歧返回候选",
+        "open_template_gallery 返回链接；VTG_DISABLE 开关",
+        "failureCopy 全部文案落地"
+      ],
+      "cost": "1.5 - 2 人日",
+      "exitCriteria": "安全项逐条可验证；端口占用不杀进程；错误文案不含绝对路径；图片走流接口不内联；缺 Origin 的正常请求不被误拒"
+    },
+    {
+      "phase": 3,
+      "name": "网页前端",
+      "work": [
+        "网格一次性渲染 + 图片懒加载 + 分类筛选",
+        "详情面板（大图、指导、来源、example case、ID 供核对）与单选/多选",
+        "『复制模板名称』按钮与多选拼接，输出与 GitHub 源一致的名称原文",
+        "加载中 / 会话失效 两种状态与重新唤起引导",
+        "首屏注入后 history.replaceState 清理地址栏 token",
+        "固定文案说明『回到对话粘贴名称即可』，不暗示自动注入"
+      ],
+      "cost": "0.5 - 1 人日",
+      "exitCriteria": "全部模板可浏览与复制；二次打开命中缓存；无内联大图；地址栏无残留 token"
+    },
+    {
+      "phase": 4,
+      "name": "宿主实测与文档",
+      "work": [
+        "Trae 端到端实测：配置 mcp.json → 调出 → 链接 → 浏览 → 复制 → 粘贴 → 模型正确匹配模板",
+        "验证 @ 与 / 两种调出形态，以及链接是否可点击、是否触发外跳拦截",
+        "验证工具 description 的触发语与反例是否生效（用户仅提模板名时不误触发）",
+        "写 Trae 与 WorkBuddy 安装章节（mcp.json 片段、绝对路径与 cwd、可选的 VTG_SKILL_ROOTS）",
+        "更新 README（本目录为网页版，Codex 面板见上游项目），移除 reload:mcp 章节",
+        "补 ADR 0005：为何放弃 MCP App 面板、改用复制名称指代"
+      ],
+      "cost": "0.5 - 1 人日",
+      "exitCriteria": "验收清单全过；新用户可仅凭 README 完成安装"
+    }
+  ],
+  "costEstimate": {
+    "total": "3.5 - 5.5 人日",
+    "note": "相对 v5 节省约 1 人日，来自取消进度协议、缓存淘汰、分页/虚拟滚动、搜索与多会话模型"
+  },
+  "acceptanceCriteria": [
+    "按 README 完成 mcp.json 配置后（VTG_SKILL_ROOTS 可省略），显式调出即返回可打开的本地链接；失败时按 failureCopy 给出可读原因",
+    "页面展示该 Skill 的全部模板；缩略图经 /api/image?t= 加载成功，页面不含 base64 内联大图",
+    "/api/gallery 缺少 token 返回 401，有效 token 返回模板数据（解析中为 503 并由前端自动重试）",
+    "不带 Origin 的同源请求不被拒绝；携带不匹配 Origin 的请求被拒绝",
+    "分类筛选、详情、单选/多选、复制名称可用",
+    "复制的文本粘贴回对话后，模型能准确匹配到对应模板（与网页显示、与 Skill 参考条目一致）",
+    "会话失效（空闲 5 分钟或进程结束）后请求被拒，页面显示统一的失效文案与重新唤起引导",
+    "Skill 路径不在允许根目录内（如 /etc/xxx）时被拒绝且不回显绝对路径；未配置 VTG_SKILL_ROOTS 时默认根目录可正常使用",
+    "端口被占用时换端口重试最多 3 次，仍失败返回可读错误且 MCP 进程存活",
+    "VTG_DISABLE=1 时工具不在列表中且不启动任何监听",
+    "插件 SKILL.md / plugin.json / docs 索引不再提及已删能力；package.json 不再依赖 @modelcontextprotocol/ext-apps；build 与 test 全绿"
+  ],
+  "risks": [
+    {
+      "risk": "模板名称存在近似，模型匹配可能出错",
+      "mitigation": "复制内容严格等于模板名称；详情面板可展 ID 供人工核对；实测出错再评估"
+    },
+    {
+      "risk": "复制粘贴多一步，用户可能嫌麻烦",
+      "mitigation": "按钮一键输出多选结果；若确需零粘贴再评估恢复最小回读工具"
+    },
+    {
+      "risk": "网页依赖 MCP 子进程存活，宿主切换会话或退出会导致页面失效",
+      "mitigation": "统一失效文案 + 重新唤起引导；文档说明该特性"
+    },
+    {
+      "risk": "工具结果中的链接可能不可点击或被外跳拦截",
+      "mitigation": "返回纯文本 URL；phase 4 实测各宿主表现，必要时再考虑自动打开（默认关）"
+    },
+    {
+      "risk": "本地 HTTP 服务引入攻击面（任意文件读、rebinding、SSRF）",
+      "mitigation": "回环绑定、token 校验、Host 与 Origin 校验、realpath 白名单、图片域名白名单一次性做对"
+    },
+    {
+      "risk": "删除面板后，若有人用本目录版本替换上游，会失去 Codex 面板能力",
+      "mitigation": "README 明确标注定位；面板能力保留在上游项目；改动在版本控制内可回滚"
+    },
+    {
+      "risk": "宿主调出形态（@ 或 /）不一",
+      "mitigation": "phase 4 实测后记录，README 分宿主给步骤"
+    },
+    {
+      "risk": "单活跃会话意味着两个对话同时使用时只有最近一次唤起的链接有效，前一个会失效",
+      "mitigation": "失效时返回统一 sessionInvalid 文案；README 明说一次只支持一个图库会话（当前规模下无需为此引入多会话表）"
+    }
+  ],
+  "designPrinciples": [
+    "默认放行：无唤起、无指代时插件『不存在』，一切照旧",
+    "插件纯被动：技能加载不触发动作，只有显式调出并由模型调用工具才启动服务",
+    "触发靠工具描述：description 是唯一机械可靠的触发点",
+    "选择是数据不是指令：模型可参考可忽略，用户任务优先",
+    "无业务状态：服务端只登记一个会话，不保存选择，名称在用户手上",
+    "不过度设计：不为未出现的规模写分页、配额、淘汰与进度协议；先用最小实现跑通真实链路",
+    "宿主约束显式化：凡宿主能力限制（img 无法带头、进程生命周期、链接可点击性）都写进方案并给降级文案",
+    "每项能力可关闭：VTG_DISABLE=1 时工具消失且不启动监听"
+  ],
+  "rollback": {
+    "baseline": "compatibleBaselineCommit 51f194d",
+    "method": "改动按阶段提交，逐阶段可 revert；服务不常驻，仅工具调用时启动，删除插件后无残留监听",
+    "noDestructiveCommands": "不执行 git reset --hard / git checkout . 等破坏性命令，除非用户明确要求"
+  },
+  "nextSteps": [
+    "用户确认本文件整体口径",
+    "确认后先留 git 恢复点，再进入 phase 1",
+    "每阶段结束更新本文件 status 与验收记录"
+  ]
+}

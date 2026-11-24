@@ -1,0 +1,20 @@
+{
+  "title": "模板 Skill 目录配置",
+  "title_en": "Template Skill Directory",
+  "description": "填写本机存放模板 Skill 的目录，图库只读取该目录下的模板，不会上传任何内容。路径仅保存在本机 ~/.workbuddy 目录。",
+  "description_en": "Enter the local directory that stores your template Skills. The gallery only reads templates from here and uploads nothing. The path is stored locally under ~/.workbuddy.",
+  "docUrl": "https://github.com/REPLACE-ME/visual-template-gallery#template-skill-directory",
+  "docLabel": "如何确定模板 Skill 目录？",
+  "fields": [
+    {
+      "key": "SKILL_ROOTS",
+      "label": "模板 Skill 目录",
+      "label_en": "Template Skill directory",
+      "type": "text",
+      "required": true,
+      "placeholder": "/Users/me/.agents/skills",
+      "description": "本机模板 Skill 所在目录，可填多个，用逗号或冒号分隔。图库会在此范围内发现并读取模板。",
+      "description_en": "Local directory containing template Skills. Multiple directories are allowed, separated by comma or colon."
+    }
+  ]
+}

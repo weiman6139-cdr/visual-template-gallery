@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "visual-template-gallery": {
+      "command": "node",
+      "args": ["./server.mjs"],
+      "cwd": ".",
+      "startup_timeout_sec": 15,
+      "tool_timeout_sec": 300
+    }
+  }
+}

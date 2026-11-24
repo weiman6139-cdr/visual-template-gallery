@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.cache/
+.DS_Store
+coverage/
+*.log
+
+# 构建产物：由 npm run build 生成，安装插件前需先构建
+plugins/visual-template-gallery/server.mjs
+plugins/visual-template-gallery/assets/

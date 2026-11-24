@@ -1,0 +1,23 @@
+{
+  "name": "可视化模板图库",
+  "name_zh": "可视化模板图库",
+  "name_en": "Visual Template Gallery",
+  "description": "Browse every template of a local Skill in a read-only web page and copy template names back into the conversation.",
+  "description_zh": "用本地只读网页浏览任意模板 Skill 的全部模板，勾选后复制模板名称带回对话，辅助生图与设计任务。",
+  "description_en": "Browse all templates of any local Skill in a read-only web page, select templates and copy their names back into the conversation to guide image and design tasks.",
+  "source": "visual-template-gallery",
+  "type": "mcp",
+  "auth_mode": "token",
+  "version": "0.3.0",
+  "minWorkbuddyVersion": "5.0.0",
+  "examples_zh": [
+    "打开 gpt-image-2-style-library 的模板图库",
+    "浏览我本地有哪些可用的设计模板",
+    "列出这个 Skill 的全部模板让我挑一个"
+  ],
+  "examples_en": [
+    "Open the template gallery of gpt-image-2-style-library",
+    "Browse what design templates I have locally",
+    "List all templates of this Skill so I can pick one"
+  ]
+}

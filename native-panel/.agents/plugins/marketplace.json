@@ -1,0 +1,5 @@
+{
+  "name": "visual-template-local",
+  "interface": { "displayName": "可视化插件（本地）" },
+  "plugins": [{ "name": "visual-template-gallery", "source": { "source": "local", "path": "./plugins/visual-template-gallery" }, "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" }, "category": "Productivity" }]
+}

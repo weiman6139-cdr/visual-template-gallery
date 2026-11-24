@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>可视化模板图库</title><style>/* APP_STYLE */</style></head>
+<body>
+<header><div class="eyebrow">VISUAL REFERENCES</div><h1>模板图库</h1><p>浏览全部模板，选择后在对话中描述你的需求。</p><button id="expand" disabled>展开图库</button><button id="collapse" hidden>回到对话内</button><p id="display-status" class="muted" role="status">正在检查展开能力…</p></header>
+<main>
+  <form id="skill-form"><label for="skill">模板 Skill</label><div class="skill-row"><input id="skill" list="skills" placeholder="Skill 目录或 SKILL.md 路径" required><datalist id="skills"></datalist><button id="open" type="submit">打开</button></div></form>
+  <p id="connection" role="status">正在连接 Codex…</p>
+  <section id="gallery" hidden>
+    <div class="filters"><label>搜索<input id="search" type="search" placeholder="名称、ID 或标签"></label><label>分类<select id="category"><option value="">全部分类</option></select></label><label>选择方式<select id="mode"><option value="multiple">多选</option><option value="single">单选</option></select></label></div>
+    <p id="warnings" class="muted"></p><p id="total" class="muted"></p>
+    <div id="cards" class="cards"></div>
+    <nav aria-label="模板分页"><button id="prev">上一页</button><label>第 <input id="page" type="number" min="1" value="1" aria-label="页码"> 页</label><span id="pages"></span><button id="next">下一页</button></nav>
+    <section class="selection"><div class="selection-heading"><h2 id="selected-count">已选 0 个模板</h2><button id="clear">清空选择</button></div><div id="selected"></div><p id="sync" role="status">尚未选择模板</p><button id="retry-sync" hidden>重试同步</button></section>
+  </section>
+</main>
+<dialog id="detail"><button id="close-detail" aria-label="关闭详情">关闭</button><h2 id="detail-title"></h2><img id="detail-image" alt="模板官方示例"><p id="detail-guidance"></p><a id="detail-source" target="_blank" rel="noreferrer">查看来源</a></dialog>
+<script type="module">/* APP_SCRIPT */</script>
+</body></html>

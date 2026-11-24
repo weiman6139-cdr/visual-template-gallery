@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "visual-template-gallery": {
+      "command": "node",
+      "args": ["__INSTALL_DIR__/server.mjs"],
+      "env": {
+        "VTG_SKILL_ROOTS": "__SKILL_ROOTS__"
+      }
+    }
+  }
+}
